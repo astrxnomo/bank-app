@@ -4,16 +4,27 @@ namespace App\Http\Controllers;
 
 use App\Models\Product;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 
 class ProductController extends Controller
 {
+    private const CACHE_TTL_SECONDS = 300;
+
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $products = Product::with('user')->paginate(10);
+        $page = (int) $request->query('page', 1);
+        $version = (int) Cache::get('products:version', 1);
+        $cacheKey = "products:index:v{$version}:page:{$page}";
+
+        $products = Cache::remember(
+            $cacheKey,
+            self::CACHE_TTL_SECONDS,
+            fn () => Product::with('user')->paginate(10)
+        );
+
         return response()->json($products, 200);
     }
 
@@ -30,15 +41,16 @@ class ProductController extends Controller
      */
     public function store(Request $request)
     {
-        // try {
-        //     DB::beginTransaction();
-            $product = Product::create($request->all());
-        //     DB::commit();
+        $validated = $request->validate([
+            'user_id' => ['required', 'integer', 'exists:users,id'],
+            'type' => ['required', 'string', 'max:255'],
+            'time' => ['required', 'string', 'max:255'],
+            'value' => ['required', 'numeric'],
+            'interest' => ['required', 'numeric'],
+        ]);
 
-        // } catch (\Exception $e) {
-        //     DB::rollBack();
-        //     return response()->json(['error' => 'Error al crear el producto', 'message'], 500);
-        // }
+        $product = Product::create($validated);
+        $this->clearProductsCache();
 
         return response()->json($product, 201);
     }
@@ -48,7 +60,15 @@ class ProductController extends Controller
      */
     public function show(Product $product)
     {
-        return response()->json($product->load('user'), 200);
+        $version = (int) Cache::get('products:version', 1);
+
+        $cachedProduct = Cache::remember(
+            "products:show:v{$version}:{$product->id}",
+            self::CACHE_TTL_SECONDS,
+            fn () => Product::with('user')->findOrFail($product->id)
+        );
+
+        return response()->json($cachedProduct, 200);
     }
 
     /**
@@ -64,15 +84,16 @@ class ProductController extends Controller
      */
     public function update(Request $request, Product $product)
     {
-        // try {
-        //     DB::beginTransaction();
-            $product->update($request->all());
-        //     DB::commit();
+        $validated = $request->validate([
+            'user_id' => ['sometimes', 'required', 'integer', 'exists:users,id'],
+            'type' => ['sometimes', 'required', 'string', 'max:255'],
+            'time' => ['sometimes', 'required', 'string', 'max:255'],
+            'value' => ['sometimes', 'required', 'numeric'],
+            'interest' => ['sometimes', 'required', 'numeric'],
+        ]);
 
-        // } catch (\Exception $e) {
-        //     DB::rollBack();
-        //     return response()->json(['error' => 'Error al actualizar el producto', 'message'], 500);
-        // }
+        $product->update($validated);
+        $this->clearProductsCache();
 
         return response()->json($product, 200);
     }
@@ -82,17 +103,15 @@ class ProductController extends Controller
      */
     public function destroy(Product $product)
     {
-        // try {
-        //     DB::beginTransaction();
-            $product = Product::find($product->id);
-            $product->delete();
-        //     DB::commit();
-
-        // } catch (\Exception $e) {
-        //     DB::rollBack();
-        //     return response()->json(['error' => 'Error al eliminar el producto', 'message'], 500);
-        // }
+        $product->delete();
+        $this->clearProductsCache();
 
         return response()->json(null, 204);
+    }
+
+    private function clearProductsCache(): void
+    {
+        $nextVersion = ((int) Cache::get('products:version', 1)) + 1;
+        Cache::forever('products:version', $nextVersion);
     }
 }
