@@ -1,6 +1,5 @@
-var endpoint = "http://127.0.0.1:8000/api/users";
 
-export function post(data,) {
+export function post(data, endpoint) {
   return fetch(endpoint, {
     method: "POST",
     headers: {

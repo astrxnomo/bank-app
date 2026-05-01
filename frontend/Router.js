@@ -4,6 +4,7 @@ import { createStaticNavigation } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Link } from '@react-navigation/native';
 import Register from './views/public/Register';
+import Login from './views/public/Login';
 
 function HomeScreen() {
   return (
@@ -11,6 +12,7 @@ function HomeScreen() {
       <Text>Home Screen</Text>
       <Link screen="Details">Go to Details</Link>
       <Link screen="Register">Go to Register</Link>
+      <Link screen="Login">Go to Login</Link>
     </View>
   );
 }
@@ -30,6 +32,7 @@ const RootStack = createNativeStackNavigator({
     Home: HomeScreen,
     Details: DetailsScreen,
     Register: Register,
+    Login: Login,
   },
 });
 
