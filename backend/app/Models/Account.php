@@ -10,7 +10,7 @@ use OwenIt\Auditing\Auditable as AuditableTrait;
 class Account extends Model implements Auditable
 {
     use SoftDeletes, AuditableTrait;
-    
+
     protected $fillable = [
         'user_id',
         'type',
